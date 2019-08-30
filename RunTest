@@ -1,0 +1,133 @@
+package cn.enjoyedu.ch2.homework;
+
+import cn.enjoyedu.ch2.tools.UseCyclicBarrier;
+import cn.enjoyedu.tools.SleepTools;
+
+import java.math.BigDecimal;
+import java.sql.SQLOutput;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CyclicBarrier;
+
+/**
+ * ClassName:  <br/>
+ * Function:  ADD FUNCTION. <br/>
+ * Reason:  ADD REASON(可选). <br/>
+ * date:   <br/>
+ *
+ * @author
+ * @since JDK 1.7
+ */
+public class RunTest
+{
+    private static CyclicBarrier barrier
+        = new CyclicBarrier(3, new RunTest.CollectThread());
+
+    //存放子线程工作结果的容器
+    private static ConcurrentHashMap<Object, Object> resultMap
+        = new ConcurrentHashMap<>();
+
+    static final BigDecimal MS_TO_S = new BigDecimal(1000);
+
+    static final BigDecimal START_TIME = new BigDecimal(System.currentTimeMillis()).divide(MS_TO_S);
+
+    static volatile boolean flag = false;
+
+    public static void main(String[] args)
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            new Thread(new RunThread(), i + "").start();
+        }
+    }
+
+    /**
+     * 汇总
+     */
+    private static class CollectThread implements Runnable
+    {
+
+        @Override
+        public void run()
+        {
+            resultMap.forEach((k, v) ->
+            {
+                System.out.println(k + "号小朋友跑了" + v + "米");
+            });
+
+        }
+    }
+
+    private static class RunThread implements Runnable
+    {
+
+        @Override
+        public void run()
+        {
+            String tid = Thread.currentThread().getName();
+            switch (tid)
+            {
+                case "0":
+                    doRun(5);
+                    break;
+                case "1":
+                    doRun(4);
+                    break;
+                case "2":
+                    doRun(3);
+                    break;
+                default:
+                    return;
+            }
+        }
+    }
+
+    public static void doRun(int speed)
+    {
+        for (; ; )
+        {
+            Thread current = Thread.currentThread();
+            String tname = current.getName();
+            int currentDistance = getConsumerTime(speed);
+
+            if (flag)
+            {
+                resultMap.put(tname, currentDistance);
+                SleepTools.ms(1);//让所有线程都阻塞一下，记录时间
+                try
+                {
+                    barrier.await();
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                catch (BrokenBarrierException e)
+                {
+                    e.printStackTrace();
+                }
+                break;
+            }
+        }
+    }
+
+    public static int getConsumerTime(int speed)
+    {
+
+        BigDecimal speedDecimal = new BigDecimal(speed);
+        long current = System.currentTimeMillis();
+        BigDecimal currentDecimal = new BigDecimal(current);
+        int currentDistance = speedDecimal.multiply(currentDecimal.divide(MS_TO_S).subtract(START_TIME)).intValue();
+        if (currentDistance >= 100)
+        {
+            flag = true;
+            System.out.println("第一个到达的小朋友用了" + (currentDecimal.divide(MS_TO_S).subtract(START_TIME).intValue()) + "秒");
+        }
+        return currentDistance;
+    }
+
+}
